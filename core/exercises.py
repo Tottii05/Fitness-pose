@@ -5,6 +5,8 @@ class Squat:
     START_T = 150
     DEPTH_T = 100
     UP_T = 160
+    SIDES = {"left": (23,25,27), "right": (24,26,28)}
+    MIN_VISIBILITY = 0.6
 
     def __init__(self):
         self.reps = 0
@@ -12,6 +14,16 @@ class Squat:
         self.phase = "up"
         self.started = False
         self.ema = EMA(0.4)
+
+    def _best_side(self, lm):
+        mejor_inidices = None
+        mejor_vis = 0.0
+        for indices in self.SIDES.values():
+            vis = min(lm[i]["v"] for i in indices)
+            if vis > mejor_vis:
+                mejor_inidices = indices
+                mejor_vis = vis
+        return mejor_inidices, mejor_vis
 
     def update_angle(self, ang):
         if self.phase == "down":
@@ -29,11 +41,15 @@ class Squat:
                 self.started = False
 
     def update(self, lm, aspect = 1.0):
-        cadera = (lm[23]["x"] * aspect, lm[23]["y"])
-        rodilla = (lm[25]["x"] * aspect, lm[25]["y"])
-        tobillo = (lm[27]["x"] * aspect, lm[27]["y"])
+        idx, vis = self._best_side(lm)
+        if vis < self.MIN_VISIBILITY:
+                    return {"reps" : self.reps, "incomplete" : self.incomplete, "phase" : self.phase,
+                             "angle" : None, "warnings": ["Ponte de lado para que se vea mejor el cuerpo"]} 
+        cadera = (lm[idx[0]]["x"] * aspect, lm[idx[0]]["y"])
+        rodilla = (lm[idx[1]]["x"] * aspect, lm[idx[1]]["y"])
+        tobillo = (lm[idx[2]]["x"] * aspect, lm[idx[2]]["y"])
         ang = angle(cadera, rodilla, tobillo)
         ang = self.ema.update(ang)
         if ang is not None:
             self.update_angle(ang)
-        return {"reps" : self.reps, "incomplete" : self.incomplete, "phase" : self.phase, "angle" : ang}
+        return {"reps" : self.reps, "incomplete" : self.incomplete, "phase" : self.phase, "angle" : ang, "warnings": []}
