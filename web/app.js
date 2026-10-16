@@ -18,6 +18,12 @@ async function crearDetector() {
   });
 }
 
+async function iniciarPython() {
+    const py = await loadPyodide();
+    console.log(py.runPython("1+1"));
+    return py;
+}
+
 boton.onclick = async () => {
   try {
     estado.textContent = "Pidiendo cámara…";
@@ -30,7 +36,9 @@ boton.onclick = async () => {
     estado.textContent = "Cargando modelo de pose…";
     const detector = await crearDetector();
     estado.textContent = "";
-
+    estado.textContent = "Cargando Python..."
+    const py = await iniciarPython();
+    estado.textContent = ""
     const bucle = () => {
         const res = detector.detectForVideo(video, performance.now());
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -39,7 +47,6 @@ boton.onclick = async () => {
             draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
             draw.drawLandmarks(lm);
         }
-        console.log(res.landmarks[0]?.[25]);
         requestAnimationFrame(bucle);
     };
     bucle();
