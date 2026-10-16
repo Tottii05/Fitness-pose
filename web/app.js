@@ -7,23 +7,30 @@ const boton = document.getElementById("start");
 const estado = document.getElementById("status");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const PY_FILES = ["__init__.py", "geometry.py", "smoothing.py", "exercises.py", "api.py"];
 
 async function crearDetector() {
-  const fileset = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
-  return PoseLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: MODEL },
-    runningMode: "VIDEO",
-    numPoses: 1,
-  });
+    const fileset = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+    return PoseLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL },
+        runningMode: "VIDEO",
+        numPoses: 1,
+    });
 }
 
 async function iniciarPython() {
     const py = await loadPyodide();
-    console.log(py.runPython("1+1"));
-    return py;
+    py.FS.mkdirTree("/home/pyodide/core");
+    for (const f of PY_FILES) {
+    const res = await fetch(`../core/${f}`);
+    const texto = await res.text();
+    const ruta = `/home/pyodide/core/${f}`;
+    py.FS.writeFile(ruta, texto);
+    }
+    py.runPython(`import sys\nsys.path.insert(0, "/home/pyodide")`);
+    return py.pyimport("core.api");
 }
-
 boton.onclick = async () => {
   try {
     estado.textContent = "Pidiendo cámara…";
@@ -37,7 +44,7 @@ boton.onclick = async () => {
     const detector = await crearDetector();
     estado.textContent = "";
     estado.textContent = "Cargando Python..."
-    const py = await iniciarPython();
+    const api = await iniciarPython();
     estado.textContent = ""
     const bucle = () => {
         const res = detector.detectForVideo(video, performance.now());
