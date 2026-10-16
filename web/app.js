@@ -7,30 +7,33 @@ const boton = document.getElementById("start");
 const estado = document.getElementById("status");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const repsEl = document.getElementById("reps");
+const warnEl = document.getElementById("warn");
 const PY_FILES = ["__init__.py", "geometry.py", "smoothing.py", "exercises.py", "api.py"];
 
 async function crearDetector() {
-    const fileset = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
-    return PoseLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: MODEL },
-        runningMode: "VIDEO",
-        numPoses: 1,
-    });
+  const fileset = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  return PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: MODEL },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  });
 }
 
 async function iniciarPython() {
-    const py = await loadPyodide();
-    py.FS.mkdirTree("/home/pyodide/core");
-    for (const f of PY_FILES) {
+  const py = await loadPyodide();
+  py.FS.mkdirTree("/home/pyodide/core");
+  for (const f of PY_FILES) {
     const res = await fetch(`../core/${f}`);
     const texto = await res.text();
     const ruta = `/home/pyodide/core/${f}`;
     py.FS.writeFile(ruta, texto);
-    }
-    py.runPython(`import sys\nsys.path.insert(0, "/home/pyodide")`);
-    return py.pyimport("core.api");
+  }
+  py.runPython(`import sys\nsys.path.insert(0, "/home/pyodide")`);
+  return py.pyimport("core.api");
 }
+
 boton.onclick = async () => {
   try {
     estado.textContent = "Pidiendo cámara…";
@@ -40,21 +43,35 @@ boton.onclick = async () => {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const draw = new DrawingUtils(ctx);
+
     estado.textContent = "Cargando modelo de pose…";
     const detector = await crearDetector();
-    estado.textContent = "";
-    estado.textContent = "Cargando Python..."
+
+    estado.textContent = "Cargando Python…";
     const api = await iniciarPython();
-    estado.textContent = ""
+    api.new_session();
+    estado.textContent = "";
+
+    const aspect = video.videoWidth / video.videoHeight;
+
     const bucle = () => {
-        const res = detector.detectForVideo(video, performance.now());
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (res.landmarks.length > 0) {
-            const lm = res.landmarks[0];
-            draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
-            draw.drawLandmarks(lm);
-        }
-        requestAnimationFrame(bucle);
+      const res = detector.detectForVideo(video, performance.now());
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (res.landmarks.length > 0) {
+        const lm = res.landmarks[0];
+        draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
+        draw.drawLandmarks(lm);
+
+        const puntos = lm.map((p) => ({ x: p.x, y: p.y, z: p.z, v: p.visibility }));
+        const payload = JSON.stringify({ aspect: aspect, lm: puntos });
+        const resultado = JSON.parse(api.process(payload));
+
+        repsEl.textContent = resultado.reps;
+        warnEl.textContent = resultado.warnings.join(" · ");
+      }
+
+      requestAnimationFrame(bucle);
     };
     bucle();
   } catch (e) {
