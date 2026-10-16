@@ -4,10 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fitness Pose</title>
+  <style>
+    .stage { position: relative; width: 100%; max-width: 640px; }
+    video, canvas { width: 100%; display: block; }
+    canvas { position: absolute; top: 0; left: 0; }
+  </style>
 </head>
 <body>
-  <video id="video" playsinline muted></video>
-  <canvas id="canvas"></canvas>
+  <div class="stage">
+    <video id="video" playsinline muted></video>
+    <canvas id="canvas"></canvas>
+  </div>
   <p id="reps">0</p>
   <p id="warn"></p>
   <p id="status"></p>
